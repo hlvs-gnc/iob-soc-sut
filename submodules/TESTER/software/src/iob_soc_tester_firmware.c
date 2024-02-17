@@ -31,15 +31,31 @@
 
 // Enable debug messages.
 #define DEBUG 0
+#define DEBUG_RX 1
+#define DEBUG_TX 1
+#define TEST_LOG 1
+#define GPIO_OPTION 1 
+#define REGFILE_OPTION 1
+#define AXIS_LOOPBACK 1
 
+#define MAX_FILE_SIZE 1048576
+#define MAX_WORDS_AXIS 1
+#define WORD_SIZE 4
 #define SUT_FIRMWARE_SIZE 29000
+#define ILA_PFSM 0
 
 void print_ila_samples();
-void send_axistream();
-void receive_axistream();
+void send_axistream(uint32_t *byte_stream, uint8_t words_in_byte_stream);
+uint8_t receive_axistream(volatile uint32_t *byte_stream);
+
+#if (ILA_PFSM == 1)
 void pfsm_program(char *);
 void ila_monitor_program(char *);
+#endif
+
 void clear_cache();
+
+unsigned char *mpeg_audio, *pcm_audio, *decoded_audio;
 
 // Send signal by uart to receive file by ethernet
 uint32_t uart_recvfile_ethernet(char *file_name) {
@@ -69,8 +85,9 @@ int main() {
   char pass_string[] = "Test passed!";
   char fail_string[] = "Test failed!";
   uint32_t file_size = 0;
-  char c, buffer[5096], *sutStr;
+  char c, buffer[4096], *sutStr;
   int i;
+
 #ifndef IOB_SOC_TESTER_INIT_MEM
   char sut_firmware[SUT_FIRMWARE_SIZE];
 #endif
@@ -82,13 +99,14 @@ int main() {
   IOB_SOC_SUT_INIT_BASEADDR(SUT0_BASE);
   // Init gpio
   gpio_init(GPIO0_BASE);
+  
   // init axistream
   axistream_in_init(AXISTREAMIN0_BASE);
   axistream_out_init(AXISTREAMOUT0_BASE, 4);
   axistream_in_enable();
   axistream_out_enable();
 
-#ifdef USE_ILA_PFSM
+#if (ILA_PFSM == 1)
     // init integrated logic analyzer
     ila_init(ILA0_BASE);
     // Enable ILA circular buffer
@@ -98,6 +116,7 @@ int main() {
 
   // init dma
   dma_init(DMA0_BASE);
+
   // init console eth
   eth_init(ETH0_BASE, &clear_cache);
 
@@ -118,17 +137,21 @@ int main() {
 
   uart16550_puts("\n\n[Tester]: Hello from tester!\n\n\n");
 
+#if (REGFILE_OPTION==1)
   // Write data to the registers of the SUT to be read by it.
   IOB_SOC_SUT_SET_REG1(64);
   IOB_SOC_SUT_SET_REG2(1024);
   uart16550_puts("[Tester]: Stored values 64 and 1024 in registers 1 and 2 of the "
             "SUT.\n\n");
+#endif
 
+#if (GPIO_OPTION==1)
   // Write a test pattern to the GPIO outputs to be read by the SUT.
   gpio_set(0x1234abcd);
   uart16550_puts("[Tester]: Placed test pattern 0x1234abcd in GPIO outputs.\n\n");
+#endif
 
-#ifdef USE_ILA_PFSM
+#if (ILA_PFSM == 1)
     // Program PFSM
     pfsm_program(buffer);
 
@@ -150,7 +173,7 @@ int main() {
       uart16550_putc(c);
       uart16550_base(UART1_BASE);
     };
-    
+  
   // Send ack to sut
   uart16550_putc(ACK);
 
@@ -183,8 +206,7 @@ int main() {
   // Make request to host
   file_size = uart16550_recvfile(buffer, sut_firmware);
 
-  uart16550_puts(
-      "[Tester]: SUT firmware obtained. Transfering it to SUT via UART...\n");
+  uart16550_puts("[Tester]: SUT firmware obtained. Transfering it to SUT via UART...\n");
 
   // Switch back to UART1
   uart16550_base(UART1_BASE);
@@ -243,10 +265,20 @@ int main() {
   //Delay to allow time for sut to run bootloader and enable its axistream
   for ( i = 0; i < (FREQ/BAUD)*256; i++)asm("nop");
 
+#if (AXIS_LOOPBACK==1)
+  // Allocate memory for byte stream
+  uint32_t *stream_out_test = (uint32_t *) calloc(MAX_WORDS_AXIS, WORD_SIZE);
+
+  // Fill byte stream to send
+  stream_out_test[0] = 0x03020100;
+
   // Send byte stream via AXI stream
-  send_axistream();
-  
-#ifdef USE_ILA_PFSM
+  send_axistream(stream_out_test, 1);
+
+  free(stream_out_test);
+#endif
+
+#if (ILA_PFSM == 1)
     // Disable all ILA triggers
     ila_disable_all_triggers();
     
@@ -256,16 +288,19 @@ int main() {
 
   // Test sending data to SUT via ethernet
   uart16550_puts("[Tester]: Sending data to SUT via ethernet:\n");
-  for(i=0; i<64; i++) {
+  for(i=0; i<4; i++) {
     buffer[i] = i; 
     printf("%d ", buffer[i]);
   }
+
   uart16550_putc('\n'); uart16550_putc('\n');
-  // Send file
-  eth_send_file(buffer, 64);
+  // Send file using ethernet interface
+  eth_send_file(buffer, 4);
+
   uart16550_puts("\n[Tester]: Reading SUT messages...\n");
   uart16550_base(UART1_BASE);
 
+#ifdef TEST_LOG
   i = 0;
   // Read and store messages sent from SUT
   // Up until it sends the test.log file
@@ -293,6 +328,7 @@ int main() {
   // ignore file contents received (test.log)
   for (i = 0; i < file_size; i++)
     uart16550_getc();
+#endif
 
   // End UART1 connection with SUT
   uart16550_finish();
@@ -307,16 +343,27 @@ int main() {
   }
   uart16550_puts("\n[Tester]: #### End of messages received from SUT ####\n\n");
 
+#if (REGFILE_OPTION==1)
   // Read data from the SUT's registers
   uart16550_puts("[Tester]: Reading SUT's register contents:\n");
   printf("[Tester]: Register 3: %d \n", IOB_SOC_SUT_GET_REG3());
   printf("[Tester]: Register 4: %d \n", IOB_SOC_SUT_GET_REG4());
+#endif
 
+#if (GPIO_OPTION==1)
   // Read pattern from GPIO inputs (was set by the SUT)
   printf("\n[Tester]: Pattern read from GPIO inputs: 0x%x\n\n", gpio_get());
+#endif
+
+#if (AXIS_LOOPBACK==1)
+  // Allocate memory for byte stream
+  volatile uint32_t *stream_in_test = (volatile uint32_t *) calloc(MAX_WORDS_AXIS, WORD_SIZE);
 
   // Read byte stream via AXI stream
-  receive_axistream();
+  receive_axistream(stream_in_test);
+
+  free((uint32_t *)stream_in_test);
+#endif
 
 #ifdef IOB_SOC_TESTER_USE_EXTMEM
   uart16550_puts("\n[Tester] Using shared external memory. Obtain SUT memory string "
@@ -336,7 +383,7 @@ int main() {
   uart16550_putc('\n');
 #endif
 
-#ifdef USE_ILA_PFSM
+#if (ILA_PFSM == 1)
     // Allocate memory for ILA output data
     const uint32_t ila_n_samples = (1<<4); //Same as buffer size
     uint32_t ila_data_size = ila_output_data_size(ila_n_samples, ILA0_DWORD_SIZE);
@@ -349,6 +396,147 @@ int main() {
     uart16550_sendfile("ila_data.bin", ila_data_size-1, buffer); //Don't send last byte (\0)
 #endif
 
+  uint32_t mpeg_file_size = 0, pcm_file_size = 0, decoded_audio_size = 0;
+
+  uart16550_puts("----------------- MPEG Decoder Testing -----------------\n");
+
+  // Receive MPEG audio file by UART (for decoding)
+  mpeg_audio = (unsigned char *) malloc(MAX_FILE_SIZE);
+
+  mpeg_file_size = uart16550_recvfile("../src/testcase-22050.mp2", mpeg_audio);
+  
+  //for(int n = 0; n < 384; n++)
+  //  printf("mpeg_audio[%d]: %d\n", n, mpeg_audio[n]);
+
+  if(mpeg_file_size > MAX_FILE_SIZE){
+    uart16550_puts("\n[Tester]: warning - input file size exceed limits\n");
+    uart16550_puts("\n[Tester]: begin new file receive and memory allocation\n");
+
+    free(mpeg_audio);
+    mpeg_audio = (unsigned char *) malloc(mpeg_file_size);
+    mpeg_file_size = uart16550_recvfile("../src/testcase-22050.mp2", mpeg_audio);
+  }
+
+  uart16550_puts("\n[Tester]: File received from console via UART\n");
+
+  //uart16550_puts("Waiting to receive pcm file\n");
+  
+  // Receive pcm file by UART (for comparison with decoded data)
+  //pcm_audio = mpeg_audio + mpeg_file_size;
+  pcm_file_size = 13824;
+
+  //pcm_audio = (unsigned char *) malloc(MAX_FILE_SIZE);
+  //pcm_file_size = uart16550_recvfile("../src/testcase-22050.pcm", pcm_audio);
+
+  //Memory for decoded data
+  decoded_audio = (unsigned char *) malloc(MAX_FILE_SIZE);
+  decoded_audio = pcm_audio + pcm_file_size;
+
+  unsigned int bytes_sent = 0; 
+  uint8_t last_percentage = 0, percentage, words_to_transfer;
+
+  volatile uint32_t *byte_stream_in;
+  uint32_t *byte_stream_out; // [MAX_WORDS_AXIS];
+  uint8_t received_words;
+
+  //Decode audio
+  while(decoded_audio_size < pcm_file_size){
+    // Try to send more MPEG encoded data if we still have any left
+    if(!axistream_out_full() & (bytes_sent < mpeg_file_size)){
+      printf("AXISTREAM_OUT_FULL: %b\n", axistream_out_full());     
+      printf("AXISTREAM_FIFO_LEVEL: %b\n", axistream_out_fifo_level());
+
+      words_to_transfer = (mpeg_file_size-bytes_sent)/WORD_SIZE >= MAX_WORDS_AXIS ? MAX_WORDS_AXIS : ((mpeg_file_size-bytes_sent)/WORD_SIZE + 1);
+      
+      byte_stream_out = (uint32_t *) calloc(words_to_transfer, WORD_SIZE);
+
+      // Convert and store the values
+      for(int n = 0; n < words_to_transfer; n++) {
+        // Combining 4 characters into a single uint32_t value
+        for(int p = 0; p < WORD_SIZE; p++)
+          byte_stream_out[n] |= (mpeg_audio[n*WORD_SIZE + p + bytes_sent] << (p * 8));
+      }
+
+      send_axistream(byte_stream_out, words_to_transfer);
+      
+      /*
+      for (;;) {
+   
+        if (axistream_out_fifo_level() == 0b1111) { 
+          axistream_out_reset();
+          axistream_out_disable();
+        }
+        else { 
+          axistream_out_enable();
+          break;
+        }
+      }
+      */
+
+      free(byte_stream_out);
+
+      bytes_sent += words_to_transfer*WORD_SIZE;
+		  printf("S[%d]\n\n", bytes_sent); //DEBUG
+	  }
+    else
+      printf("AXISTREAM_OUT_FULL: %b\n", axistream_out_full());     
+
+    //Try to receive more pcm data if there is any
+    if((!axistream_in_empty())){
+      printf("AXISTREAM_IN_EMPTY: %b\n", axistream_in_empty());
+      byte_stream_in = (volatile uint32_t *) calloc(MAX_WORDS_AXIS, WORD_SIZE);
+
+      received_words = receive_axistream(byte_stream_in);
+
+      /*
+      // Convert and store the values to the decoded audio array
+      for(int k = 0; k < received_words; k++) {
+        // Extracting each byte and converting it to a character
+        for(int m = 0; m < WORD_SIZE; m++)
+          decoded_audio[k*WORD_SIZE + m + decoded_audio_size] = (byte_stream_in[k] >> (m * 8)) & 0xFF;
+      }
+
+      //Check if bytes decoded are as expected
+      for(i = 0; i < words_to_transfer*WORD_SIZE; i++){
+        if(decoded_audio[decoded_audio_size+i]!=pcm_audio[decoded_audio_size+i]){
+        printf("\nTest failed: Decoded byte at 0x%x with value 0x%x is different from PCM file value 0x%x!\n\n",decoded_audio_size+i, decoded_audio[decoded_audio_size+i],pcm_audio[decoded_audio_size+i]);
+        uart16550_finish();
+        return -1;
+        }
+      }
+      */
+
+      decoded_audio_size += received_words*WORD_SIZE;
+      printf("R[%d]\n\n", decoded_audio_size); //DEBUG
+      free((uint32_t *)byte_stream_in);
+		}
+    if(axistream_in_empty())
+      printf("AXISTREAM_IN_EMPTY: %b\n", axistream_in_empty());
+
+    //Print progress
+    if((percentage = decoded_audio_size*10/pcm_file_size)>last_percentage){
+      printf("%3d %%\n",percentage*10);
+      last_percentage=percentage;
+    }
+  }
+
+  uart16550_puts("\nTest complete! PCM file and decoded audio are equal.\n\n");
+
+  // Send back decoded file by UART
+  
+  uart16550_puts("Sending decoded audio file...\n");
+  char w_file[] = "testcase-22050.pcm";
+  uart16550_sendfile(w_file,
+                     decoded_audio_size,
+                     decoded_audio);
+
+  free(mpeg_audio);
+  free(pcm_audio);
+  free(decoded_audio);
+
+  //Free memory
+  axistream_out_reset();
+
   uart16550_puts("\n[Tester]: Verification successful!\n\n");
   uart16550_sendfile("test.log", strlen(pass_string), pass_string);
 
@@ -356,7 +544,7 @@ int main() {
   uart16550_finish();
 }
 
-#ifdef USE_ILA_PFSM
+#if (ILA_PFSM == 1)
 // Program independent PFSM peripheral of the Tester
 void pfsm_program(char *bitstreamBuffer){
   // init Programmable Finite State Machine
@@ -394,7 +582,7 @@ void print_ila_samples() {
 
   // Allocate memory for samples
   // Each buffer sample has 2 * 32 bit words
-  volatile uint32_t *samples = (volatile uint32_t *)malloc((ila_buffer_size*2)*sizeof(uint32_t));
+  volatile uint32_t *samples = (volatile uint32_t *)malloc((ila_buffer_size*2)*WORD_SIZE);
 
   // Point ila cursor to the latest sample
   ila_set_cursor(latest_sample_index,0);
@@ -415,55 +603,56 @@ void print_ila_samples() {
 
   free((uint32_t *)samples);
 }
-#endif //USE_ILA_PFSM
+#endif
 
-void send_axistream() {
+void send_axistream(uint32_t *byte_stream, uint8_t words_in_byte_stream) {
   uint8_t i;
-  uint8_t words_in_byte_stream = 4; 
-  // Allocate memory for byte stream
-  uint32_t *byte_stream = (uint32_t *)malloc(words_in_byte_stream*sizeof(uint32_t));
-  // Fill byte stream to send
-  byte_stream[0] = 0x03020100;
-  byte_stream[1] = 0x07060504;
-  byte_stream[2] = 0xbbaa0908;
-  byte_stream[3] = 0xffeeddcc;
 
+  uart16550_puts("[Tester]: Sending AXI stream bytes\n");
+
+#if (DEBUG_TX==1)
   // Print byte stream to send
-  uart16550_puts("[Tester]: Sending AXI stream bytes: ");
-  for (i = 0; i < words_in_byte_stream*4; i++)
-    printf("0x%02x ", ((uint8_t *)byte_stream)[i]);
+  // Convert and store the values to the decoded audio array
+  for(int k = 0; k < words_in_byte_stream; k++) {
+    // Extracting each byte and converting it to a character
+    for(int m = 0; m < WORD_SIZE; m++)
+      printf("0x%02x ",  (byte_stream[k] >> (m * 8)) & 0xFF);
+  }
   uart16550_puts("\n");
+#endif
 
   // Send bytes to AXI stream output via DMA, except the last word.
-  uart16550_puts("[Tester]: Loading AXI words via DMA...\n");
   dma_start_transfer(byte_stream, words_in_byte_stream-1, 0, 0);
   // Send the last word with via SWregs with the TLAST signal.
-  uart16550_puts("[Tester]: Loading last AXI word via SWregs...\n\n");
   axistream_out_push(byte_stream[words_in_byte_stream-1], 1, 1);
-
-  free(byte_stream);
 }
 
-void receive_axistream() {
-  uint8_t i;
+uint8_t receive_axistream(volatile uint32_t *byte_stream) {
+  uint8_t i = 0, rstrb;
+
   uint8_t n_received_words = axistream_in_fifo_level();
-  
-  // Allocate memory for byte stream
-  volatile uint32_t *byte_stream = (volatile uint32_t *)malloc((n_received_words)*sizeof(uint32_t));
 
-  // Transfer bytes from AXI stream input via DMA
-  uart16550_puts("[Tester]: Storing AXI words via DMA...\n");
-  dma_start_transfer((uint32_t *)byte_stream+i, n_received_words, 1, 0);
+  if(!axistream_in_empty()){
 
-  clear_cache();
+    // Transfer bytes from AXI stream input via DMA
+    uart16550_puts("[Tester]: Storing AXI words via DMA\n");
+    dma_start_transfer((uint32_t *)byte_stream+i, n_received_words, 1, 0);
 
-  // Print byte stream received
-  uart16550_puts("[Tester]: Received AXI stream bytes: ");
-  for (i = 0; i < n_received_words*4; i++)
-    printf("0x%02x ", ((volatile uint8_t *)byte_stream)[i]);
-  uart16550_puts("\n\n");
+    clear_cache();
 
-  free((uint32_t *)byte_stream);
+    uart16550_puts("[Tester]: Received AXI stream bytes\n");
+
+#if (DEBUG_RX==1)
+    // Print byte stream received
+    for (i = 0; i < n_received_words*WORD_SIZE; i++)
+      printf("0x%02x ", ((volatile uint8_t *)byte_stream)[i]);
+
+    uart16550_puts("\n");
+#endif
+  }
+
+  return n_received_words;
+
 }
 
 void clear_cache(){

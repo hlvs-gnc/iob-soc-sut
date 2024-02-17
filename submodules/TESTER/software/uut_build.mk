@@ -17,7 +17,7 @@ iob_soc_sut_firmware.bin: ../../software/iob_soc_sut_firmware.bin
 
 UTARGETS+=build_iob_soc_sut_software
 
-IOB_SOC_SUT_INCLUDES=-I. -Isrc 
+IOB_SOC_SUT_INCLUDES=-I. -Isrc
 
 IOB_SOC_SUT_BOOT_LFLAGS=-Wl,-Bstatic,-T,src/iob_soc_sut_boot.lds,--strip-debug
 IOB_SOC_SUT_FW_LFLAGS=-Wl,-Bstatic,-T,src/iob_soc_sut_firmware.lds,--strip-debug
@@ -26,9 +26,17 @@ IOB_SOC_SUT_FW_LFLAGS=-Wl,-Bstatic,-T,src/iob_soc_sut_firmware.lds,--strip-debug
 IOB_SOC_SUT_FW_SRC=src/iob_soc_sut_firmware.S
 IOB_SOC_SUT_FW_SRC+=src/iob_soc_sut_firmware.c
 IOB_SOC_SUT_FW_SRC+=src/printf.c
+
 # PERIPHERAL SOURCES
 IOB_SOC_SUT_FW_SRC+=$(wildcard src/iob-*.c)
 IOB_SOC_SUT_FW_SRC+=$(filter-out %_emul.c, $(wildcard src/*swreg*.c))
+
+# LIBMAD SOURCES
+SW_LIBMAD_DIR=src/LIBMAD
+LIBMAD_FLAGS=-DFPM_DEFAULT -DNDEBUG -DPROFILING
+
+IOB_SOC_SUT_INCLUDES+=-I$(SW_LIBMAD_DIR)
+IOB_SOC_SUT_FW_SRC+=$(filter-out $(SW_LIBMAD_DIR)/minimad.c, $(wildcard $(SW_LIBMAD_DIR)/*.c))
 
 # BOOTLOADER SOURCES
 IOB_SOC_SUT_BOOT_SRC+=src/iob_soc_sut_boot.S
@@ -37,7 +45,7 @@ IOB_SOC_SUT_BOOT_SRC+=$(filter-out %_emul.c, $(wildcard src/iob*uart*.c))
 IOB_SOC_SUT_BOOT_SRC+=$(filter-out %_emul.c, $(wildcard src/iob*cache*.c))
 
 build_iob_soc_sut_software:
-	make iob_soc_sut_firmware.elf INCLUDES="$(IOB_SOC_SUT_INCLUDES)" LFLAGS="$(IOB_SOC_SUT_FW_LFLAGS) -Wl,-Map,iob_soc_sut_firmware.map" SRC="$(IOB_SOC_SUT_FW_SRC)" TEMPLATE_LDS="src/iob_soc_sut_firmware.lds"
+	make iob_soc_sut_firmware.elf INCLUDES="$(IOB_SOC_SUT_INCLUDES)" LFLAGS="$(IOB_SOC_SUT_FW_LFLAGS) $(LIBMAD_FLAGS) -Wl,-Map,iob_soc_sut_firmware.map" SRC="$(IOB_SOC_SUT_FW_SRC)" TEMPLATE_LDS="src/iob_soc_sut_firmware.lds"
 	make iob_soc_sut_boot.elf INCLUDES="$(IOB_SOC_SUT_INCLUDES)" LFLAGS="$(IOB_SOC_SUT_BOOT_LFLAGS) -Wl,-Map,iob_soc_sut_boot.map" SRC="$(IOB_SOC_SUT_BOOT_SRC)" TEMPLATE_LDS="src/iob_soc_sut_boot.lds"
 
 

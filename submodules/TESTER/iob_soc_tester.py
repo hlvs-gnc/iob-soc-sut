@@ -5,6 +5,7 @@ import glob
 
 from iob_soc_opencryptolinux import iob_soc_opencryptolinux
 from iob_soc_sut import iob_soc_sut
+from iob_soc_mp2d import iob_soc_mp2d
 from iob_gpio import iob_gpio
 from iob_uart16550 import iob_uart16550
 from iob_axistream_in import iob_axistream_in
@@ -36,6 +37,7 @@ class iob_soc_tester(iob_soc_opencryptolinux):
         submodules = [
             iob_uart16550,
             iob_soc_sut,
+            iob_soc_mp2d,
             iob_gpio,
             iob_axistream_in,
             iob_axistream_out,
@@ -1335,7 +1337,7 @@ endif
                 {
                     "name": "SRAM_ADDR_W",
                     "type": "P",
-                    "val": "17",
+                    "val": "18",
                     "min": "1",
                     "max": "32",
                     "descr": "SRAM address width",

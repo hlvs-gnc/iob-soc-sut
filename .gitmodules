@@ -25,3 +25,6 @@
 [submodule "submodules/TESTER/submodules/DMA"]
 	path = submodules/TESTER/submodules/DMA
 	url = git@github.com:IObundle/iob-dma.git
+[submodule "submodules/TESTER/submodules/MPEGD"]
+	path = submodules/TESTER/submodules/MPEGD
+	url = git@github.com:hlvs-gnc/iob-mp2-d.git

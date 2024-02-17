@@ -418,7 +418,7 @@ class iob_soc_sut(iob_soc):
                 },
                 {
                     "corename": "internal",
-                    "if_name": "AXISTRREAMOUT0",
+                    "if_name": "AXISTREAMOUT0",
                     "port": "",
                     "bits": [],
                 },
@@ -432,7 +432,7 @@ class iob_soc_sut(iob_soc):
                 },
                 {
                     "corename": "internal",
-                    "if_name": "AXISTRREAMOUT0",
+                    "if_name": "AXISTREAMOUT0",
                     "port": "",
                     "bits": [],
                 },
@@ -446,7 +446,7 @@ class iob_soc_sut(iob_soc):
                 },
                 {
                     "corename": "internal",
-                    "if_name": "AXISTRREAMOUT0",
+                    "if_name": "AXISTREAMOUT0",
                     "port": "",
                     "bits": [],
                 },
@@ -460,7 +460,7 @@ class iob_soc_sut(iob_soc):
                 },
                 {
                     "corename": "internal",
-                    "if_name": "AXISTRREAMOUT0",
+                    "if_name": "AXISTREAMOUT0",
                     "port": "input_ports",
                     "bits": [1],
                 },
@@ -677,8 +677,8 @@ class iob_soc_sut(iob_soc):
         insert_verilog_in_module(
             """
     assign AXISTREAMIN0_tready_i = 1'b0;
-    assign AXISTRREAMOUT0_tvalid_i = 1'b0;
-    assign AXISTRREAMOUT0_tdata_i = 1'b0;
+    assign AXISTREAMOUT0_tvalid_i = 1'b0;
+    assign AXISTREAMOUT0_tdata_i = 1'b0;
              """,
             cls.build_dir + "/hardware/src/iob_soc_sut.v",
         )
@@ -765,7 +765,7 @@ endif
                 {
                     "name": "SRAM_ADDR_W",
                     "type": "P",
-                    "val": "16",
+                    "val": "18",
                     "min": "1",
                     "max": "32",
                     "descr": "SRAM address width",
