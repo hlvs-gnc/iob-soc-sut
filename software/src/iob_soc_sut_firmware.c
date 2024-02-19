@@ -82,7 +82,7 @@ enum mad_flow input(void *data,
   while(axistream_in_empty());
 
   //Fill buffer with new data
-  while(!axistream_in_empty() && (bufferUnprocessedData+MAX_AXIS_BYTES-1 < INPUTBUFFERSIZE)){
+  if(!axistream_in_empty() && (bufferUnprocessedData+MAX_AXIS_BYTES-1 < INPUTBUFFERSIZE)){
     
     byte_stream_in = (volatile uint32_t *) calloc(MAX_WORDS_AXIS, WORD_SIZE);
     
@@ -96,10 +96,6 @@ enum mad_flow input(void *data,
 
     bufferUnprocessedData += r_words*j;
 
-    for(i = 0; i < r_words-1; i++)
-      axistream_out_push(byte_stream_in[i],1,0);
-    axistream_out_push(byte_stream_in[i],1,1); // Send the last word with the TLAST signal
-    
   }
 
   free((uint32_t *) byte_stream_in);
