@@ -318,17 +318,17 @@ int main()
   uint32_t file_size;
   file_size = uart16550_recvfile_ethernet("../src/eth_example.txt");
   eth_rcv_file(file_buffer,file_size);
-  uart_puts("\n[MPEG-Decoder]: File received from console via ethernet:\n");
+  uart16550_puts("\n[MPEG-Decoder]: File received from console via ethernet:\n");
   for(i=0; i<file_size; i++)
     uart16550_putc(file_buffer[i]);
 #endif //SIMULATION
 #endif //USE_TESTER
 
   //Write to UART0 connected to the Tester.
-  uart_puts("\n\n[MPEG-Decoder]: This message was sent from SUT!\n\n");
+  uart16550_puts("\n\n[MPEG-Decoder]: This message was sent from SUT!\n\n");
 
   if(ethernet_connected){
-    uart_puts("[MPEG-Decoder]: Data received via ethernet:\n");
+    uart16550_puts("[MPEG-Decoder]: Data received via ethernet:\n");
     for(i=0; i<4; i++)
       printf("%d ", buffer[i]);
     uart16550_putc('\n'); uart16550_putc('\n');
@@ -336,14 +336,14 @@ int main()
   
 #if (REGFILE_OPTION==1)
   //Print contents of REGFILEIF registers 1 and 2
-  uart_puts("[MPEG-Decoder]: Reading REGFILEIF contents:\n");
+  uart16550_puts("[MPEG-Decoder]: Reading REGFILEIF contents:\n");
   printf("[MPEG-Decoder]: Register 1: %d \n", IOB_REGFILEIF_INVERTED_GET_REG1());
   printf("[MPEG-Decoder]: Register 2: %d \n\n", IOB_REGFILEIF_INVERTED_GET_REG2());
 
   //Write data to the registers of REGFILEIF to be read by the Tester.
   IOB_REGFILEIF_INVERTED_SET_REG3(128);
   IOB_REGFILEIF_INVERTED_SET_REG4(2048);
-  uart_puts("[MPEG-Decoder]: Stored values 128 and 2048 in REGFILEIF registers 3 and 4.\n\n");
+  uart16550_puts("[MPEG-Decoder]: Stored values 128 and 2048 in REGFILEIF registers 3 and 4.\n\n");
 #endif
 
 #if (GPIO_OPTION==1)
@@ -352,7 +352,7 @@ int main()
 
   //Write the same pattern to GPIO outputs
   gpio_set(0xabcd1234);
-  uart_puts("[MPEG-Decoder]: Placed test pattern 0xabcd1234 in GPIO outputs.\n\n");
+  uart16550_puts("[MPEG-Decoder]: Placed test pattern 0xabcd1234 in GPIO outputs.\n\n");
 #endif
 
 #if (AXIS_LOOPBACK==1)
@@ -363,21 +363,21 @@ int main()
 #ifdef IOB_SOC_SUT_USE_EXTMEM
   char sutMemoryMessage[]="Shared memory content is shared\n";
 
-  uart_puts("\n[MPEG-Decoder]: Using external memory. Stored a string in memory at location: ");
+  uart16550_puts("\n[MPEG-Decoder]: Using external memory. Stored a string in memory at location: ");
   printf("0x%x\n", (int)sutMemoryMessage);
   
   //Give address of stored message to Tester using regfileif register 4
   IOB_REGFILEIF_INVERTED_SET_REG5((int)sutMemoryMessage);
-  uart_puts("[MPEG-Decoder]: Stored string memory location in REGFILEIF register 5.\n");
+  uart16550_puts("[MPEG-Decoder]: Stored string memory location in REGFILEIF register 5.\n");
 #endif
 
 #ifdef IOB_SOC_SUT_USE_EXTMEM
   //if(memory_access_failed)
-  //    uart_sendfile("test.log", strlen(fail_string), fail_string);
-  //    uart_finish();
+  //    uart16550_sendfile("test.log", strlen(fail_string), fail_string);
+  //    uart16550_finish();
 #endif
 
-  uart_puts("------------- MPEG Decoder Initialization -------------\n");
+  uart16550_puts("------------- MPEG Decoder Initialization -------------\n");
 
   /* configure input, output, and error functions */
   mad_decoder_init(&decoder, 0 /* private message struct */,
@@ -385,10 +385,10 @@ int main()
 			             error, 0 /* message */);
 
 #ifdef TEST_LOG
-  uart_sendfile("test.log", strlen(pass_string), pass_string);
+  uart16550_sendfile("test.log", strlen(pass_string), pass_string);
 #endif
 
-  uart_finish();
+  uart16550_finish();
 
   /*
   * The SUT waits for the start signal to be reset, then
@@ -419,7 +419,7 @@ void axistream_loopback(){
 
     // Print received bytes
 #if (DEBUG==1)
-    uart_puts("[MPEG-Decoder]: Received AXI stream bytes: ");
+    uart16550_puts("[MPEG-Decoder]: Received AXI stream bytes: ");
 
     for(i = 0; i < received_words*WORD_SIZE; i++)
       printf("0x%02x ", ((uint8_t *)byte_stream)[i]);
@@ -431,10 +431,10 @@ void axistream_loopback(){
     axistream_out_push(byte_stream[i],1,1); // Send the last word with the TLAST signal
     
 #if (DEBUG==1)
-    uart_puts("\n[MPEG-Decoder]: Sent AXI stream bytes back via output interface.\n\n");
+    uart16550_puts("\n[MPEG-Decoder]: Sent AXI stream bytes back via output interface.\n\n");
   } else {
     // Input AXI stream queue is empty
-    uart_puts("[MPEG-Decoder]: AXI stream input is empty. Skipping AXI stream tranfer.\n\n");
+    uart16550_puts("[MPEG-Decoder]: AXI stream input is empty. Skipping AXI stream tranfer.\n\n");
 #endif
   }
 }
