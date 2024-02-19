@@ -6,9 +6,8 @@
 #include "iob_soc_sut_system.h"
 #include "iob_soc_sut_periphs.h"
 #include "iob_soc_sut_conf.h"
-#include "iob-uart.h"
+#include "iob-uart16550.h"
 #include "iob-gpio.h"
-#include "iob_cache_swreg.h"
 #include "iob-eth.h"
 #include "printf.h"
 #include "iob_regfileif_inverted_swreg.h"
@@ -36,7 +35,13 @@
 #define MAX_AXIS_BYTES MAX_WORDS_AXIS*WORD_SIZE
 
 void axistream_loopback();
-void clear_cache();
+
+void clear_cache(){
+  // Delay to ensure all data is written to memory
+  for ( unsigned int i = 0; i < 10; i++)asm volatile("nop");
+  // Flush VexRiscv CPU internal cache
+  asm volatile(".word 0x500F" ::: "memory");
+}
 
 char pass_string[] = "Test passed!";
 char fail_string[] = "Test failed!";
@@ -227,25 +232,25 @@ enum mad_flow error(void *data,
 }
 
 // Send signal by uart to receive file by ethernet
-uint32_t uart_recvfile_ethernet(char *file_name) {
+uint32_t uart16550_recvfile_ethernet(char *file_name) {
 
-  uart_puts(UART_PROGNAME);
-  uart_puts (": requesting to receive file by ethernet\n");
+  uart16550_puts(UART_PROGNAME);
+  uart16550_puts (": requesting to receive file by ethernet\n");
 
   //send file receive by ethernet request
-  uart_putc (0x13);
+  uart16550_putc (0x13);
 
   //send file name (including end of string)
-  uart_puts(file_name); uart_putc(0);
+  uart16550_puts(file_name); uart16550_putc(0);
 
   // receive file size
-  uint32_t file_size = uart_getc();
-  file_size |= ((uint32_t)uart_getc()) << 8;
-  file_size |= ((uint32_t)uart_getc()) << 16;
-  file_size |= ((uint32_t)uart_getc()) << 24;
+  uint32_t file_size = uart16550_getc();
+  file_size |= ((uint32_t)uart16550_getc()) << 8;
+  file_size |= ((uint32_t)uart16550_getc()) << 16;
+  file_size |= ((uint32_t)uart16550_getc()) << 24;
 
   // send ACK before receiving file
-  uart_putc(ACK);
+  uart16550_putc(ACK);
 
   return file_size;
 }
@@ -259,8 +264,8 @@ int main()
   int result;
 
   //init uart
-  uart_init(UART0_BASE,FREQ/BAUD);   
-  printf_init(&uart_putc);
+  uart16550_init(UART0_BASE, FREQ/(16*BAUD));
+  printf_init(&uart16550_putc);
   //init regfileif
   IOB_REGFILEIF_INVERTED_INIT_BASEADDR(REGFILEIF0_BASE);
   //init gpio
@@ -270,9 +275,6 @@ int main()
   axistream_out_init(AXISTREAMOUT0_BASE, 4);
   axistream_in_enable();
   axistream_out_enable();
-
-  // init cache
-  IOB_CACHE_INIT_BASEADDR((1 << IOB_SOC_SUT_E) + (1 << IOB_SOC_SUT_MEM_ADDR_W));
   // init eth
   eth_init(ETH0_BASE, &clear_cache);
 
@@ -280,23 +282,47 @@ int main()
   eth_wait_phy_rst();
   
 #ifdef USE_TESTER
-  // Receive data from Tester via Ethernet
-  ethernet_connected = 1;
-  eth_rcv_file(buffer, 4);
+  // Receive a special string message from tester to tell if its running linux
+  char tester_run_type[] = "TESTER_RUN_";
+  for ( i = 0; i < 11; ) {
+    if (uart16550_getc() == tester_run_type[i])
+      i++;
+    else
+      i = 0;
+  }
+  char tester_run_type2[] = "LINUX";
+  int tester_run_linux = 1;
+  for ( i = 0; i < 5; ) {
+    if (uart16550_getc() == tester_run_type2[i]) {
+      i++;
+    } else {
+      tester_run_linux = 0;
+      break;
+    }
+  }
 
-  //Delay to allow time for tester to print debug messages
-  for ( i = 0; i < (FREQ/BAUD)*128; i++)asm("nop");
-#else
+  if (!tester_run_linux) { //Ethernet does not work on Linux yet
+    uart16550_puts("[SUT]: Tester running on bare metal\n");
+    // Receive data from Tester via Ethernet
+    ethernet_connected = 1;
+    eth_rcv_file(buffer, 64);
+
+    //Delay to allow time for tester to print debug messages
+    for ( i = 0; i < (FREQ/BAUD)*128; i++)asm("nop");
+  } else {
+    uart16550_puts("[SUT]: Tester running on Linux\n");
+  }
+#else //USE_TESTER
 #ifndef SIMULATION
   // Receive data from console via Ethernet
   uint32_t file_size;
-  file_size = uart_recvfile_ethernet("../src/eth_example.txt");
+  file_size = uart16550_recvfile_ethernet("../src/eth_example.txt");
   eth_rcv_file(file_buffer,file_size);
   uart_puts("\n[MPEG-Decoder]: File received from console via ethernet:\n");
   for(i=0; i<file_size; i++)
-    uart_putc(file_buffer[i]);
-#endif
-#endif
+    uart16550_putc(file_buffer[i]);
+#endif //SIMULATION
+#endif //USE_TESTER
 
   //Write to UART0 connected to the Tester.
   uart_puts("\n\n[MPEG-Decoder]: This message was sent from SUT!\n\n");
@@ -305,7 +331,7 @@ int main()
     uart_puts("[MPEG-Decoder]: Data received via ethernet:\n");
     for(i=0; i<4; i++)
       printf("%d ", buffer[i]);
-    uart_putc('\n'); uart_putc('\n');
+    uart16550_putc('\n'); uart16550_putc('\n');
   }
   
 #if (REGFILE_OPTION==1)
@@ -411,11 +437,4 @@ void axistream_loopback(){
     uart_puts("[MPEG-Decoder]: AXI stream input is empty. Skipping AXI stream tranfer.\n\n");
 #endif
   }
-}
-
-void clear_cache(){
-  // Delay to ensure all data is written to memory
-  for ( unsigned int i = 0; i < 10; i++)asm volatile("nop");
-  // Flush system cache
-  IOB_CACHE_SET_INVALIDATE(1);
 }
