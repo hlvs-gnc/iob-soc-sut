@@ -13,7 +13,7 @@ iob_soc_sut_firmware.bin: ../../software/iob_soc_sut_firmware.bin
 
 UTARGETS+=build_iob_soc_sut_software
 
-IOB_SOC_SUT_INCLUDES=-I. -Isrc
+IOB_SOC_SUT_INCLUDES=-I. -Isrc 
 
 IOB_SOC_SUT_BOOT_LFLAGS=-Wl,-Bstatic,-T,src/iob_soc_sut_boot.lds,--strip-debug
 IOB_SOC_SUT_FW_LFLAGS=-Wl,-Bstatic,-T,src/iob_soc_sut_firmware.lds,--strip-debug
