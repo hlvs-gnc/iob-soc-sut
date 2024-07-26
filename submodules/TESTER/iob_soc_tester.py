@@ -835,7 +835,7 @@ copy_remote_simulation_ila_data:
                 {
                     "corename": "AXISTREAMIN0",
                     "if_name": "interrupt",
-                    "port": "fifo_threshold_o",
+                    "port": "interrupt_o",
                     "bits": [],
                 },
                 {

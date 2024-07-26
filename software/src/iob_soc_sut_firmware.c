@@ -26,6 +26,7 @@
 #define GPIO_OPTION 1 
 #define REGFILE_OPTION 1
 #define AXIS_LOOPBACK 1
+#define SCALING 1
 
 #define INPUTBUFFERSIZE 4096
 #define NBR_BYTES 1024

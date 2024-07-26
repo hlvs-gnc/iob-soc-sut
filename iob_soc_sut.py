@@ -140,6 +140,20 @@ class iob_soc_sut(iob_soc_opencryptolinux):
                 {
                     "corename": "AXISTREAMIN0",
                     "if_name": "axistream",
+                    "port": "interrupt_o",
+                    "bits": [],
+                },
+                {
+                    "corename": "internal", 
+                    "if_name": "AXISTREAMIN0",
+                    "port": "",
+                    "bits": []
+                },
+            ),
+            (
+                {
+                    "corename": "AXISTREAMIN0",
+                    "if_name": "axistream",
                     "port": "axis_clk_i",
                     "bits": [],
                 },
@@ -229,64 +243,6 @@ class iob_soc_sut(iob_soc_opencryptolinux):
                 },
                 {
                     "corename": "external",
-                    "if_name": "AXISTREAMIN0",
-                    "port": "",
-                    "bits": [],
-                },
-            ),
-            # AXISTREAM IN DMA
-            # Connect these signals to internal floating wires.
-            (
-                {
-                    "corename": "AXISTREAMIN0",
-                    "if_name": "dma",
-                    "port": "tvalid_o",
-                    "bits": [],
-                },
-                {
-                    "corename": "internal",
-                    "if_name": "AXISTREAMIN0",
-                    "port": "",
-                    "bits": [],
-                },
-            ),
-            (
-                {
-                    "corename": "AXISTREAMIN0",
-                    "if_name": "dma",
-                    "port": "tready_i",
-                    "bits": [],
-                },
-                {
-                    "corename": "internal",
-                    "if_name": "AXISTREAMIN0",
-                    "port": "",
-                    "bits": [],
-                },
-            ),
-            (
-                {
-                    "corename": "AXISTREAMIN0",
-                    "if_name": "dma",
-                    "port": "tdata_o",
-                    "bits": [],
-                },
-                {
-                    "corename": "internal",
-                    "if_name": "AXISTREAMIN0",
-                    "port": "",
-                    "bits": [],
-                },
-            ),
-            (
-                {
-                    "corename": "AXISTREAMIN0",
-                    "if_name": "interrupt",
-                    "port": "fifo_threshold_o",
-                    "bits": [],
-                },
-                {
-                    "corename": "internal",
                     "if_name": "AXISTREAMIN0",
                     "port": "",
                     "bits": [],
@@ -391,64 +347,6 @@ class iob_soc_sut(iob_soc_opencryptolinux):
                     "bits": [],
                 },
             ),
-            # AXISTREAM OUT DMA
-            # Connect these signals to internal floating wires.
-            (
-                {
-                    "corename": "AXISTREAMOUT0",
-                    "if_name": "dma",
-                    "port": "tvalid_i",
-                    "bits": [],
-                },
-                {
-                    "corename": "internal",
-                    "if_name": "AXISTREAMOUT0",
-                    "port": "",
-                    "bits": [],
-                },
-            ),
-            (
-                {
-                    "corename": "AXISTREAMOUT0",
-                    "if_name": "dma",
-                    "port": "tready_o",
-                    "bits": [],
-                },
-                {
-                    "corename": "internal",
-                    "if_name": "AXISTREAMOUT0",
-                    "port": "",
-                    "bits": [],
-                },
-            ),
-            (
-                {
-                    "corename": "AXISTREAMOUT0",
-                    "if_name": "dma",
-                    "port": "tdata_i",
-                    "bits": [],
-                },
-                {
-                    "corename": "internal",
-                    "if_name": "AXISTREAMOUT0",
-                    "port": "",
-                    "bits": [],
-                },
-            ),
-            (
-                {
-                    "corename": "AXISTREAMOUT0",
-                    "if_name": "interrupt",
-                    "port": "fifo_threshold_o",
-                    "bits": [],
-                },
-                {
-                    "corename": "internal",
-                    "if_name": "AXISTREAMOUT0",
-                    "port": "input_ports",
-                    "bits": [1],
-                },
-            ),
         ]
 
         super()._create_instances()
@@ -480,6 +378,7 @@ class iob_soc_sut(iob_soc_opencryptolinux):
    assign AXISTREAMIN0_axis_tvalid_i = 1'b0;
    assign AXISTREAMIN0_axis_tdata_i = {`IOB_SOC_SUT_AXISTREAMIN0_TDATA_W{1'b0}};
    assign AXISTREAMIN0_axis_tlast_i = 1'b0;
+   assign AXISTREAMIN0_axis_interrupt_o = interrupt_o;
 
    assign AXISTREAMOUT0_axis_clk_i = clk_i;
    assign AXISTREAMOUT0_axis_cke_i = 1'b1;
